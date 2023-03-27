@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import argparse, datetime, json, sys, time
+from typing import Optional
+
 import backoff
 import requests
 import singer
@@ -40,7 +42,7 @@ def request(url, params):
     return response
 
 
-def do_sync(base, start_date, end_date=None):
+def do_sync(base, start_date: str, end_date: Optional[str] = None) -> Optional[str]:
     state = {"start_date": start_date}
     next_date = start_date
 
@@ -103,12 +105,14 @@ def do_sync(base, start_date, end_date=None):
 
         singer.write_state(state)
         logger.info(json.dumps(
-            {"message": "tap completed successfully."}
+            {"message": f"tap completed successfully rows={len(dates)}"}
         ))
+        return next_date
     else:
         logger.info(json.dumps(
             {"message": "tap completed successfully (nothing done, no new data)."}
         ))
+        return None
 
 
 def main():
@@ -143,7 +147,9 @@ def main():
     end_date = singer.utils.strptime_with_tz(
         end_date).date().strftime(DATE_FORMAT)
 
-    do_sync(config.get("base", "EUR"), start_date, end_date)
+    next_date = start_date
+    while next_date and datetime.datetime.strptime(next_date, DATE_FORMAT) < datetime.datetime.utcnow():
+        next_date = do_sync(config.get("base", "EUR"), next_date, end_date)
 
 
 if __name__ == "__main__":
