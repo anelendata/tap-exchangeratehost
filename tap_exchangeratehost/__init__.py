@@ -46,7 +46,7 @@ def do_sync(base, start_date, end_date=None):
 
     if not end_date:
         end_date = (
-            datetime.date.today() + timedelta(days=1)).strftime(DATE_FORMAT)
+            datetime.date.today() + datetime.timedelta(days=1)).strftime(DATE_FORMAT)
 
     params = {
         "base": base,
