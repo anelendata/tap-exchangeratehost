@@ -71,39 +71,44 @@ def do_sync(base, start_date, end_date=None):
         singer.write_state(state)
         sys.exit(-1)
 
-    # Make schema
-    schema = {
-        "type": "object",
-         "properties": {
-             "date": {
-                 "type": "string",
-                 "format": "date-time",
+    if start_date in response["rates"]:
+        # Make schema
+        schema = {
+            "type": "object",
+             "properties": {
+                 "date": {
+                     "type": "string",
+                     "format": "date-time",
+                 },
              },
-         },
-    }
-    # Populate the currencies
-    for rate in response["rates"][start_date]:
-        if rate not in schema["properties"]:
-            schema["properties"][rate] = {"type": ["null", "number"]}
+        }
+        # Populate the currencies
+        for rate in response["rates"][start_date]:
+            if rate not in schema["properties"]:
+                schema["properties"][rate] = {"type": ["null", "number"]}
 
-    singer.write_schema("exchange_rate", schema, "date")
+        singer.write_schema("exchange_rate", schema, "date")
 
-    # Write records ordered by the date
-    dates = [d for d in response["rates"].keys()]
-    dates.sort()
-    for d in dates:
-        record = parse_rates(response, d)
-        if not record:
-            continue
-        singer.write_records("exchange_rate", [record])
-        next_date = (datetime.datetime.strptime(d, DATE_FORMAT) +
-                     datetime.timedelta(days=1)).strftime(DATE_FORMAT)
-        state = {"start_date": next_date}
+        # Write records ordered by the date
+        dates = [d for d in response["rates"].keys()]
+        dates.sort()
+        for d in dates:
+            record = parse_rates(response, d)
+            if not record:
+                continue
+            singer.write_records("exchange_rate", [record])
+            next_date = (datetime.datetime.strptime(d, DATE_FORMAT) +
+                         datetime.timedelta(days=1)).strftime(DATE_FORMAT)
+            state = {"start_date": next_date}
 
-    singer.write_state(state)
-    logger.info(json.dumps(
-        {"message": "tap completed successfully."}
-    ))
+        singer.write_state(state)
+        logger.info(json.dumps(
+            {"message": "tap completed successfully."}
+        ))
+    else:
+        logger.info(json.dumps(
+            {"message": "tap completed successfully (nothing done, no new data)."}
+        ))
 
 
 def main():
