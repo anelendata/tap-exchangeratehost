@@ -42,6 +42,25 @@ def request(url, params):
     return response
 
 
+def make_schema(response: dict, dates: list[str]) -> dict:
+    # Make Singer schema
+    schema = {
+        "type": "object",
+        "properties": {
+            "date": {
+                "type": "string",
+                "format": "date-time",
+            },
+        },
+    }
+    last_date = dates[-1]
+    # Populate the currencies
+    for rate in response["rates"][last_date]:
+        if rate not in schema["properties"]:
+            schema["properties"][rate] = {"type": ["null", "number"]}
+    return schema
+
+
 def do_sync(base, start_date: str, end_date: Optional[str] = None) -> Optional[str]:
     state = {"start_date": start_date}
     next_date = start_date
@@ -74,26 +93,12 @@ def do_sync(base, start_date: str, end_date: Optional[str] = None) -> Optional[s
         sys.exit(-1)
 
     if start_date in response["rates"]:
-        # Make schema
-        schema = {
-            "type": "object",
-             "properties": {
-                 "date": {
-                     "type": "string",
-                     "format": "date-time",
-                 },
-             },
-        }
-        # Populate the currencies
-        for rate in response["rates"][start_date]:
-            if rate not in schema["properties"]:
-                schema["properties"][rate] = {"type": ["null", "number"]}
-
-        singer.write_schema("exchange_rate", schema, "date")
 
         # Write records ordered by the date
-        dates = [d for d in response["rates"].keys()]
-        dates.sort()
+        dates = sorted([d for d in response["rates"].keys()])
+
+        singer.write_schema("exchange_rate", make_schema(response, dates), "date")
+
         for d in dates:
             record = parse_rates(response, d)
             if not record:
