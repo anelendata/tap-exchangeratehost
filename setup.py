@@ -13,7 +13,7 @@ setup(
     version=VERSION,
     description="Singer.io tap for extracting currency exchange rate data from the exchangerate.host API",
     long_description=long_description,
-    long_description_content_type="text/markdown",
+    # long_description_content_type="text/markdown",
     author="Daigo Tanaka, Anelen Co., LLC",
     url="http://github.com/anelendata/tap-exchangeratehost",
     classifiers=[
@@ -23,9 +23,11 @@ setup(
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: POSIX :: Linux",
 
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
     ],
     install_requires=[
         "singer-python>=5.3.0",
