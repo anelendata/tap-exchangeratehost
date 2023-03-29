@@ -71,7 +71,7 @@ Then run:
 
 ```
 $ pip install -r requirements_dev.txt
-$ bin/release_build
+$ bin/release_build  # Use username: __token__ and PyPi token whem prompted.
 $ git tag v<Enter proper version like 0.1.2>
 $ git push origin --tags
 ```
