@@ -1,5 +1,10 @@
 ## History
 
+### 0.1.2 (2023-03-29)
+
+- Fix pypi description
+- No code change
+
 ### 0.1.1 (2023-03-27)
 
 - Allow running tap multiple times the same day

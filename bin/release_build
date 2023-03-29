@@ -10,4 +10,6 @@ python3 -m build
 
 # test
 # python3 -m twine upload --repository testpypi dist/*
+
+# production
 twine upload dist/*

@@ -2,7 +2,7 @@
 
 from setuptools import setup
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
@@ -13,7 +13,7 @@ setup(
     version=VERSION,
     description="Singer.io tap for extracting currency exchange rate data from the exchangerate.host API",
     long_description=long_description,
-    # long_description_content_type="text/markdown",
+    long_description_content_type="text/markdown",
     author="Daigo Tanaka, Anelen Co., LLC",
     url="http://github.com/anelendata/tap-exchangeratehost",
     classifiers=[
