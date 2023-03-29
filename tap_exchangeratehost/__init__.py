@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-
-import argparse, datetime, json, sys, time
+from __future__ import annotations
+import argparse
+from datetime import datetime, timedelta, date
+import json
+import sys
+import time
+from typing import Optional
 import backoff
 import requests
 import singer
@@ -9,15 +14,16 @@ import singer
 endpoint = "https://api.exchangerate.host/timeseries"
 logger = singer.get_logger()
 
-DATE_FORMAT="%Y-%m-%d"
+DATE_FORMAT = "%Y-%m-%d"
 
-def parse_rates(r, date):
-    if not r["rates"][date]:
+
+def parse_rates(r, rate_date):
+    if not r["rates"][rate_date]:
         return None
-    parsed = r["rates"][date]
+    parsed = r["rates"][rate_date]
     parsed[r["base"]] = 1.0
     parsed["date"] = time.strftime(
-        "%Y-%m-%dT%H:%M:%SZ", time.strptime(date, DATE_FORMAT))
+        "%Y-%m-%dT%H:%M:%SZ", time.strptime(rate_date, DATE_FORMAT))
     return parsed
 
 
@@ -29,7 +35,7 @@ def giveup(error):
 
 
 @backoff.on_exception(backoff.constant,
-                      (requests.exceptions.RequestException),
+                      requests.exceptions.RequestException,
                       jitter=backoff.random_jitter,
                       max_tries=5,
                       giveup=giveup,
@@ -40,13 +46,33 @@ def request(url, params):
     return response
 
 
-def do_sync(base, start_date, end_date=None):
+def make_schema(response: dict, dates: list[str]) -> dict:
+    # Make Singer schema
+    schema = {
+        "type": "object",
+        "properties": {
+            "date": {
+                "type": "string",
+                "format": "date-time",
+            },
+        },
+    }
+    last_date = dates[-1]
+    # Populate the currencies
+    for rate in response["rates"][last_date]:
+        if rate not in schema["properties"]:
+            # noinspection PyTypeChecker
+            schema["properties"][rate] = {"type": ["null", "number"]}
+    return schema
+
+
+def do_sync(base, start_date: str, end_date: Optional[str] = None) -> Optional[str]:
     state = {"start_date": start_date}
     next_date = start_date
 
     if not end_date:
         end_date = (
-            datetime.date.today() + timedelta(days=1)).strftime(DATE_FORMAT)
+            date.today() + timedelta(days=1)).strftime(DATE_FORMAT)
 
     params = {
         "base": base,
@@ -71,39 +97,32 @@ def do_sync(base, start_date, end_date=None):
         singer.write_state(state)
         sys.exit(-1)
 
-    # Make schema
-    schema = {
-        "type": "object",
-         "properties": {
-             "date": {
-                 "type": "string",
-                 "format": "date-time",
-             },
-         },
-    }
-    # Populate the currencies
-    for rate in response["rates"][start_date]:
-        if rate not in schema["properties"]:
-            schema["properties"][rate] = {"type": ["null", "number"]}
+    if start_date in response["rates"]:
 
-    singer.write_schema("exchange_rate", schema, "date")
+        # Write records ordered by the date
+        dates = sorted([d for d in response["rates"].keys()])
 
-    # Write records ordered by the date
-    dates = [d for d in response["rates"].keys()]
-    dates.sort()
-    for d in dates:
-        record = parse_rates(response, d)
-        if not record:
-            continue
-        singer.write_records("exchange_rate", [record])
-        next_date = (datetime.datetime.strptime(d, DATE_FORMAT) +
-                     datetime.timedelta(days=1)).strftime(DATE_FORMAT)
-        state = {"start_date": next_date}
+        singer.write_schema("exchange_rate", make_schema(response, dates), "date")
 
-    singer.write_state(state)
-    logger.info(json.dumps(
-        {"message": "tap completed successfully."}
-    ))
+        for d in dates:
+            record = parse_rates(response, d)
+            if not record:
+                continue
+            singer.write_records("exchange_rate", [record])
+            next_date = (datetime.strptime(d, DATE_FORMAT) +
+                         timedelta(days=1)).strftime(DATE_FORMAT)
+            state = {"start_date": next_date}
+
+        singer.write_state(state)
+        logger.info(json.dumps(
+            {"message": f"tap completed successfully rows={len(dates)}"}
+        ))
+        return next_date
+    else:
+        logger.info(json.dumps(
+            {"message": "tap completed successfully (nothing done, no new data)."}
+        ))
+        return None
 
 
 def main():
@@ -129,16 +148,18 @@ def main():
         state = {}
 
     start_date = (state.get("start_date") or config.get("start_date") or
-                  datetime.datetime.utcnow().strftime(DATE_FORMAT))
+                  datetime.utcnow().strftime(DATE_FORMAT))
     start_date = singer.utils.strptime_with_tz(
         start_date).date().strftime(DATE_FORMAT)
 
     end_date = (config.get("end_date") or
-                datetime.datetime.utcnow().strftime(DATE_FORMAT))
+                datetime.utcnow().strftime(DATE_FORMAT))
     end_date = singer.utils.strptime_with_tz(
         end_date).date().strftime(DATE_FORMAT)
 
-    do_sync(config.get("base", "EUR"), start_date, end_date)
+    next_date = start_date
+    while next_date and datetime.strptime(next_date, DATE_FORMAT) < datetime.utcnow():
+        next_date = do_sync(config.get("base", "EUR"), next_date, end_date)
 
 
 if __name__ == "__main__":
