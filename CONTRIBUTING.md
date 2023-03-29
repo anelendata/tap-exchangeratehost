@@ -69,10 +69,12 @@ A reminder for the maintainers on how to deploy.
 Make sure all your changes are committed (including an entry in HISTORY.md, and AUTHORS.md).
 Then run:
 
+```
 $ pip install -r requirements_dev.txt
 $ bin/release_build
 $ git tag v<Enter proper version like 0.1.2>
 $ git push origin --tags
+```
 
 Update release info on GitHub (Copy & paste the current HISTORY entry should be enough):
 https://github.com/anelendata/tap-exchangeratehost/releases
